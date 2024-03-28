@@ -58,13 +58,20 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(planes)
         # Add shortcut
         # If gradient will explode, jump out of the block
+        # x = x + f(x)
         self.shortcut = nn.Sequential()
-        # If the block will change output size from input size, we will apply conv
+        # If the block will change output size from input size, we will apply only one conv
         if stride != 1 or in_planes != expansion * planes:
             self.shortcut = nn.Sequential(
-                
-            ) 
-        
+                nn.Conv2d(
+                    in_channels=in_planes,
+                    out_channels=expansion*planes,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False
+                ),
+                nn.BatchNorm2d(expansion*planes)
+            )
     
     def forward(self, x):
         # Input: x
@@ -72,6 +79,13 @@ class BasicBlock(nn.Module):
         # Apply batch normalize after convolution
         out = relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
+        # out = out + f(x)
+        # If f(x) != out:
+        #   applied shortcut
+        out += self.shortcut(x)
+        # Apply last relu
+        out = relu(out)
+        return out
         
     
         
