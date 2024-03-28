@@ -31,7 +31,7 @@ class MLP(nn.Module):
 #   in_planes (W = ?)
 # Output size (W^1) =  ((W - K + 2P) / S) + 1
 def conv3x3(in_planes, out_planes, stride=1):
-    # Input channels  = 3 for RGB
+    # Input channels = 3 for RGB
     return nn.Conv2d(
         in_channels=in_planes,
         out_channels=out_planes,
@@ -40,10 +40,12 @@ def conv3x3(in_planes, out_planes, stride=1):
         padding=1,
         bias=False
     )
-    
+
+# Entire block inside the res net
 class BasicBlock(nn.Module):
-    def __init__(self, in_planes, planes, stride=1, expansion=1) -> None:
+    def __init__(self, in_planes, planes, stride=1) -> None:
         super(BasicBlock, self).__init__()
+        self.expansion = 1
         # Conv 3x3
         # Input: in_planes -> output: planes
         self.conv1 = conv3x3(in_planes=in_planes, out_planes=planes, stride=stride)
@@ -61,16 +63,16 @@ class BasicBlock(nn.Module):
         # x = x + f(x)
         self.shortcut = nn.Sequential()
         # If the block will change output size from input size, we will apply only one conv
-        if stride != 1 or in_planes != expansion * planes:
+        if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(
                     in_channels=in_planes,
-                    out_channels=expansion*planes,
+                    out_channels=self.expansion*planes,
                     kernel_size=1,
                     stride=stride,
                     bias=False
                 ),
-                nn.BatchNorm2d(expansion*planes)
+                nn.BatchNorm2d(self.expansion*planes)
             )
     
     def forward(self, x):
@@ -91,6 +93,26 @@ class BasicBlock(nn.Module):
         
     
 class ResNet(nn.Module):
-    def __init__(self, nblocks,) -> None:
+    # (BasicBlock, [2, 2, 2, 2], nclasses, nf)
+    # nclasses = 10
+    # nf = 20
+    def __init__(self, block, number_blocks, num_classes, nf) -> None:
         super(ResNet, self).__init__()
-        pass
+        # nf rappresent model complexity
+        
+        self.in_planes = nf
+        # First conv 3
+        self.conv1 = conv3x3(3, nf * 1)
+        self.layer1 = self.make_layer(block, nf * 1, number_blocks[0], stride=1)
+        self.layer2 = self.make_layer(block, nf * 2, number_blocks[1], stride=2)
+        self.layer3 = self.make_layer(block, nf * 4, number_blocks[2], stride=2)
+        self.layer3 = self.make_layer(block, nf * 8, number_blocks[3], stride=2)
+        
+        
+    def make_layer(self, block, planes, number_blocks, stride):
+        strides = [stride] + [1] * (number_blocks - 1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
